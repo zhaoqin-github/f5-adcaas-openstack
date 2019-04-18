@@ -89,6 +89,7 @@ export class AdcController extends BaseController {
     }
 
     if (adc.type === 'HW') {
+      //TODO: Disable this path after VE path is stable.
       //TODO: Do this check in API validator
       if (!adc.management || !adc.management.ipAddress) {
         throw new HttpErrors.BadRequest(
@@ -96,7 +97,11 @@ export class AdcController extends BaseController {
         );
       }
 
-      this.trustAdc(adc);
+      this.trustAdc(adc).then(() => {
+        if (adc.status === 'TRUSTED') {
+          this.installAS3(adc);
+        }
+      });
     }
 
     return new Response(Adc, adc);
@@ -129,12 +134,15 @@ export class AdcController extends BaseController {
 
       await checkAndWait(isTrusted, 30, [device.targetUUID]).then(
         async () => {
-          await this.serialize(adc, {status: 'TRUSTED'});
+          await this.serialize(adc, {
+            status: 'TRUSTED',
+            trustedDeviceId: device.targetUUID,
+          });
         },
         async () => {
           await this.serialize(adc, {
             status: 'TRUSTERROR',
-            lastErr: 'Trusting timeout',
+            lastErr: 'TRUSTERROR: Trusting timeout',
           });
         },
       );
@@ -155,6 +163,54 @@ export class AdcController extends BaseController {
       return false;
     }
     return true;
+  }
+
+  async installAS3(adc: Adc): Promise<void> {
+    try {
+      let exist = await this.asgMgr.as3Exists(adc.trustedDeviceId!);
+
+      if (exist) {
+        return;
+      }
+    } catch (e) {
+      throw new HttpErrors.InternalServerError(e.message);
+    }
+
+    let as3Available = async (deviceId: string): Promise<boolean> => {
+      return await this.asgMgr.getAS3State(deviceId).then(state => {
+        switch (state) {
+          case 'AVAILABLE':
+            return true;
+          default:
+            //TODO: throw error after checkAndWait() supports error terminating
+            return false;
+        }
+      });
+    };
+
+    // Install AS3 RPM on target device
+    try {
+      await this.serialize(adc, {status: 'INSTALLING'});
+
+      await this.asgMgr.installAS3(adc.trustedDeviceId!);
+
+      await checkAndWait(as3Available, 30, [adc.trustedDeviceId!]).then(
+        async () => {
+          await this.serialize(adc, {status: 'ACTIVE'});
+        },
+        async () => {
+          await this.serialize(adc, {
+            status: 'INSTALLERROR',
+            lastErr: 'INSTALLERROR: Fail to install AS3',
+          });
+        },
+      );
+    } catch (err) {
+      await this.serialize(adc, {
+        status: 'INSTALLERROR',
+        lastErr: 'INSTALLERROR: ' + err.Message,
+      });
+    }
   }
 
   @get(prefix + '/adcs/count', {
@@ -402,8 +458,12 @@ export class AdcController extends BaseController {
               async () => {
                 await this.serialize(adc, {status: 'ONBOARDED'});
 
-                //Build trust relation to VE
-                await this.trustAdc(adc);
+                //Build trust relation to VE and install AS3
+                await this.trustAdc(adc).then(async () => {
+                  if (adc.status === 'TRUSTED') {
+                    await this.installAS3(adc);
+                  }
+                });
               },
               async () => {
                 await this.serialize(adc, {

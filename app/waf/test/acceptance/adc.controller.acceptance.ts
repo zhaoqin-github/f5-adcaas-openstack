@@ -49,6 +49,8 @@ describe('AdcController', () => {
   let trustStub: sinon.SinonStub;
   let queryStub: sinon.SinonStub;
   let untrustStub: sinon.SinonStub;
+  let installStub: sinon.SinonStub;
+  let queryExtensionsStub: sinon.SinonStub;
 
   let mockKeystoneApp: TestingApplication;
   let mockNovaApp: TestingApplication;
@@ -116,12 +118,16 @@ describe('AdcController', () => {
     trustStub = sinon.stub(controller.asgService, 'trust');
     queryStub = sinon.stub(controller.asgService, 'queryTrust');
     untrustStub = sinon.stub(controller.asgService, 'untrust');
+    installStub = sinon.stub(controller.asgService, 'install');
+    queryExtensionsStub = sinon.stub(controller.asgService, 'queryExtensions');
   });
 
   afterEach(async () => {
     trustStub.restore();
     queryStub.restore();
     untrustStub.restore();
+    installStub.restore();
+    queryExtensionsStub.restore();
   });
 
   after(async () => {
@@ -181,6 +187,23 @@ describe('AdcController', () => {
       ],
     });
 
+    queryExtensionsStub.onCall(0).returns([]);
+
+    queryExtensionsStub.onCall(1).returns([
+      {
+        rpmFile: 'f5-appsvcs-3.10.0-5.noarch.rpm',
+        state: 'UPLOADING',
+      },
+    ]);
+
+    queryExtensionsStub.onCall(2).returns([
+      {
+        rpmFile: 'f5-appsvcs-3.10.0-5.noarch.rpm',
+        name: 'f5-appsvcs',
+        state: 'AVAILABLE',
+      },
+    ]);
+
     let response = await client
       .post(prefix + '/adcs')
       .set('X-Auth-Token', ExpectedData.userToken)
@@ -198,7 +221,7 @@ describe('AdcController', () => {
       .set('tenant-id', ExpectedData.tenantId)
       .expect(200);
 
-    expect(response.body.adc.status).to.equal('TRUSTED');
+    expect(response.body.adc.status).to.equal('ACTIVE');
   });
 
   it(
@@ -422,7 +445,7 @@ describe('AdcController', () => {
       .expect(200);
 
     expect(response.body.adc.status).to.equal('TRUSTERROR');
-    expect(response.body.adc.lastErr).to.equal('Trusting timeout');
+    expect(response.body.adc.lastErr).to.equal('TRUSTERROR: Trusting timeout');
   });
 
   it('get ' + prefix + '/adcs: of all', async () => {
@@ -738,6 +761,23 @@ describe('AdcController', () => {
       ],
     });
 
+    queryExtensionsStub.onCall(0).returns([]);
+
+    queryExtensionsStub.onCall(1).returns([
+      {
+        rpmFile: 'f5-appsvcs-3.10.0-5.noarch.rpm',
+        state: 'UPLOADING',
+      },
+    ]);
+
+    queryExtensionsStub.onCall(2).returns([
+      {
+        rpmFile: 'f5-appsvcs-3.10.0-5.noarch.rpm',
+        name: 'f5-appsvcs',
+        state: 'AVAILABLE',
+      },
+    ]);
+
     await setupEnvs()
       .then(async () => {
         let response = await client
@@ -754,9 +794,10 @@ describe('AdcController', () => {
             .set('X-Auth-Token', ExpectedData.userToken)
             .expect(200);
 
-          return resp.body.adc.status === 'TRUSTED';
+          return resp.body.adc.status === 'ACTIVE';
         };
 
+        //TODO: This test can not return comparing failure.
         await checkAndWait(checkStatus, 5, [], 50).then(() => {
           expect(true).true();
         });
