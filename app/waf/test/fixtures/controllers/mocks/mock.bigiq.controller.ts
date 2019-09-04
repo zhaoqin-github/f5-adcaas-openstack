@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
-import {MockBaseController} from './mock.base.controller';
-import {post, param, get} from '@loopback/rest';
+import {requestBody, post, get} from '@loopback/rest';
 import {ResponseWith} from '../../datasources/testrest.datasource';
+import {MockBaseController} from './mock.base.controller';
 
-export class MockDOController extends MockBaseController {
-  @post('/mgmt/shared/declarative-onboarding')
-  async sysInfo(): Promise<object> {
-    return await ResponseWith.do_post_mgmt_shared_declaration_onboarding!();
+export class MockBigIqController extends MockBaseController {
+  @post('/mgmt/shared/authn/login')
+  async login(@requestBody() reqBody: object): Promise<object> {
+    return ResponseWith.bigiq_post_login!();
   }
 
-  @get('/mgmt/shared/declarative-onboarding/task/{taskId}')
-  async taskResult(
-    @param.path.string('taskId') taskId: string,
-  ): Promise<object> {
-    return await ResponseWith.do_get_mgmt_shared_declaration_onboarding_task_taskId!();
+  @post('/mgmt/cm/device/tasks/licensing/pool/member-management')
+  async revoke(@requestBody() reqBody: object): Promise<object> {
+    return ResponseWith.bigiq_post_revoke_license!();
+  }
+
+  @get('/mgmt/cm/device/tasks/licensing/pool/member-management/{taskId}')
+  async queryTask(): Promise<object> {
+    return ResponseWith.bigiq_get_revoke_task!();
   }
 }

@@ -28,6 +28,7 @@ OS_INTERFACE=public
 # OnBoarding Parameters
 DO_ENDPOINT=https://do-server:443
 DO_BIGIQ_HOST=10.250.11.138
+DO_BIGIQ_PORT=443
 DO_BIGIQ_USERNAME=admin
 DO_BIGIQ_PASSWORD=admin
 DO_BIGIQ_POOL=newman-pool

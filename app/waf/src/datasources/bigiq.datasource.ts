@@ -14,9 +14,17 @@
  * limitations under the License.
  */
 
-export * from './db.datasource';
-export * from './asg.datasource';
-export * from './openstack.datasource';
-export * from './do.datasource';
-export * from './bigip.datasource';
-export * from './bigiq.datasource';
+import {inject} from '@loopback/core';
+import {juggler} from '@loopback/repository';
+import * as config from './bigiq.datasource.json';
+
+export class BigIqDataSource extends juggler.DataSource {
+  static dataSourceName = 'bigiq';
+
+  constructor(
+    @inject('datasources.config.bigiq', {optional: true})
+    dsConfig: object = config,
+  ) {
+    super(dsConfig);
+  }
+}

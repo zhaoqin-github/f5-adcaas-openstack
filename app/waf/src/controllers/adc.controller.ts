@@ -53,6 +53,8 @@ import {
   PortCreationParams,
   ServersParams,
   BigIpManager,
+  BigIqService,
+  BigIqManager,
   OnboardingManager,
   BigipBuiltInProperties,
   ASGServiceProvider,
@@ -64,6 +66,7 @@ const prefix = '/adcaas/v1';
 
 export class AdcController extends BaseController {
   asgMgr: ASGManager;
+  bigIqMgr: BigIqManager;
   private adcStCtr: AdcStateCtrlr;
   private logger = factory.getLogger('Unknown: controllers.adc');
 
@@ -74,6 +77,8 @@ export class AdcController extends BaseController {
     public adcTenantAssociationRepository: AdcTenantAssociationRepository,
     @inject('services.ASGService')
     public asgService: ASGService,
+    @inject('services.BigIqService')
+    public bigIqService: BigIqService,
     //Suppress get injection binding exeption by using {optional: true}
     @inject(RestBindings.Http.CONTEXT, {optional: true})
     protected reqCxt: RequestContext,
@@ -83,6 +88,7 @@ export class AdcController extends BaseController {
     super(reqCxt);
     if (reqCxt) {
       this.asgMgr = new ASGManager(this.asgService, this.reqCxt.name);
+      this.bigIqMgr = new BigIqManager(this.bigIqService, this.reqCxt.name);
       this.logger = factory.getLogger(this.reqCxt.name + ': controllers.adc');
     }
   }
@@ -714,44 +720,11 @@ export class AdcController extends BaseController {
   }
 
   private async deleteOn(adc: Adc, addon: AddonReqValues): Promise<void> {
+    let adcMgmtIp = adc.management.connection!.ipAddress;
+
     let reclaimFuncs: {[key: string]: Function} = {
       license: async () => {
-        let doMgr = await OnboardingManager.instanlize(
-          this.wafapp,
-          {},
-          this.reqCxt.name,
-        );
-        let doBody = await doMgr.assembleDo(
-          adc,
-          Object.assign(addon, {onboarding: false}),
-        );
-        this.logger.debug(
-          'Json used for revoke license: ' + JSON.stringify(doBody),
-        );
-        await doMgr.onboard(doBody).then(async () => {
-          // TODO: create a unified bigipMgr
-          let cnct = adc.management.connection!;
-          let bigipMgr = await BigIpManager.instanlize(
-            {
-              username: cnct.username,
-              password: cnct.password,
-              ipAddr: cnct.ipAddress,
-              port: cnct.tcpPort,
-            },
-            this.reqCxt.name,
-          );
-
-          //TODO: support quiting immediately
-          let noLicensed = async () => {
-            if (adc.license) return true;
-            return await bigipMgr.getLicense().then(license => {
-              return license.registrationKey === 'none';
-            });
-          };
-          await checkAndWait(noLicensed, 240).catch(() => {
-            throw new Error('Timeout for waiting for reclaiming license.');
-          });
-        });
+        await this.bigIqMgr.revokeLicense(adcMgmtIp);
       },
 
       network: async () => {
@@ -812,7 +785,7 @@ export class AdcController extends BaseController {
 
     this.logger.debug(`start to reclaim ${adc.id}`);
     await this.serialize(adc, {status: AdcState.RECLAIMING, lastErr: ''});
-    for (let f of ['trust', 'license', 'vm', 'network']) {
+    for (let f of ['trust', 'vm', 'network', 'license']) {
       await reclaimFuncs[f]();
     }
     this.logger.debug(`succeed for reclaiming ${adc.id}`);
@@ -885,7 +858,10 @@ export class AdcController extends BaseController {
 
       let doMgr = await OnboardingManager.instanlize(
         this.wafapp,
-        {},
+        {
+          endpoint: adc.getDoEndpoint(),
+          basicAuth: adc.getBasicAuth(),
+        },
         this.reqCxt.name,
       );
       let doBody = await doMgr.assembleDo(

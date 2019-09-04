@@ -53,6 +53,7 @@ export class OnboardingManager {
   private application: RestApplication;
   public config: {
     endpoint: string;
+    basicAuth: string;
     async: boolean;
     timeout: number;
     licPool: {
@@ -118,6 +119,7 @@ export class OnboardingManager {
 
     this.config = {
       endpoint: process.env.DO_ENDPOINT!,
+      basicAuth: '',
       async: true,
       timeout: 900, // from onboarding prompt: should be <= 900
       licPool: {
@@ -471,7 +473,7 @@ export class OnboardingManager {
 
   async onboard(givenDoBody: TypeDOClassDO): Promise<string> {
     // TODO: base64 coding for admin:admin. Modify it later if needed
-    let headers = {Authorization: 'Basic YWRtaW46YWRtaW4='};
+    let headers = {Authorization: 'Basic ' + this.config.basicAuth};
 
     return this.doService
       .doRest(
@@ -496,7 +498,7 @@ export class OnboardingManager {
 
   async isDone(doId: string): Promise<boolean> {
     // TODO: base64 coding for admin:admin. Modify it later if needed
-    let headers = {Authorization: 'Basic YWRtaW46YWRtaW4='};
+    let headers = {Authorization: 'Basic ' + this.config.basicAuth};
 
     return await this.doService
       .doRest(
@@ -512,6 +514,19 @@ export class OnboardingManager {
           return resObj[0]['result']['code'] === 200;
         },
         reason => {
+          // Wait for iControl LX restarting
+          if (reason.statusCode === 503) {
+            return false;
+          }
+          // Wait for reloading DO plugin
+          if (
+            reason.statusCode === 404 &&
+            reason.message.includes(
+              'URI path /mgmt/shared/declarative-onboarding/task/',
+            )
+          ) {
+            return false;
+          }
           // if onboarding fails.
           let mesg =
             'Failed to query onboarding status: ' + JSON.stringify(reason);

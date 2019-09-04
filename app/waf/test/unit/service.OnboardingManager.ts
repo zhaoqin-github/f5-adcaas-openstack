@@ -93,7 +93,8 @@ describe('test OnboardingManager', async () => {
   });
 
   it('onboard: ok', async () => {
-    let adc = <Adc>createAdcObject();
+    let adc = new Adc(createAdcObject());
+    doMgr.config.endpoint = adc.getDoEndpoint();
     let dobody = await doMgr.assembleDo(adc, addon);
     let response = await doMgr.onboard(dobody);
     expect(response).eql(ExpectedData.doTaskId);
@@ -114,11 +115,15 @@ describe('test OnboardingManager', async () => {
   });
 
   it('isDone: true', async () => {
+    let adc = new Adc(createAdcObject());
+    doMgr.config.endpoint = adc.getDoEndpoint();
     let response = await doMgr.isDone(ExpectedData.doTaskId);
     expect(response).eql(true);
   });
 
   it('isDone: false', async () => {
+    let adc = new Adc(createAdcObject());
+    doMgr.config.endpoint = adc.getDoEndpoint();
     LetResponseWith({
       do_get_mgmt_shared_declaration_onboarding_task_taskId:
         StubResponses.onboardingSucceed202,
@@ -128,6 +133,8 @@ describe('test OnboardingManager', async () => {
   });
 
   it('isDone: exception while getting', async () => {
+    let adc = new Adc(createAdcObject());
+    doMgr.config.endpoint = adc.getDoEndpoint();
     LetResponseWith({
       do_get_mgmt_shared_declaration_onboarding_task_taskId:
         StubResponses.response400,
