@@ -21,11 +21,11 @@ import {factory} from '../log4ts';
 import {Logger} from 'typescript-logging';
 import {checkAndWait} from '../utils';
 
-const BIGIQ_HOST: string = process.env.DO_BIGIQ_HOST || 'localhost';
-const BIGIQ_PORT: number = Number(process.env.DO_BIGIQ_PORT) || 8888;
-const BIGIQ_USERNAME: string = process.env.DO_BIGIQ_USERNAME || 'admin';
-const BIGIQ_PASSWORD: string = process.env.DO_BIGIQ_PASSWORD || 'admin';
-const BIGIQ_POOL: string = process.env.DO_BIGIQ_POOL || 'unknown';
+const BIGIQ_HOST: string = process.env.BIGIQ_HOST || 'localhost';
+const BIGIQ_PORT: number = Number(process.env.BIGIQ_PORT) || 8888;
+const BIGIQ_USERNAME: string = process.env.BIGIQ_USERNAME || 'admin';
+const BIGIQ_PASSWORD: string = process.env.BIGIQ_PASSWORD || 'admin';
+const BIGIQ_POOL: string = process.env.BIGIQ_POOL || 'unknown';
 
 type BigIqToken = {
   token: string;
